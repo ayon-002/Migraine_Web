@@ -1,0 +1,25 @@
+{
+  "name": "Migraine Risk Monitor",
+  "short_name": "Migraine Monitor",
+  "description": "IoT environmental monitoring dashboard for migraine trigger risk.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4F7F8",
+  "theme_color": "#0F3A5F",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
