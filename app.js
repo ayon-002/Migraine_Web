@@ -26,7 +26,7 @@
 // Example:
 // http://192.168.0.104:3000
 //
-const API_BASE_URL = "http://192.168.0.104:3000";
+const API_BASE_URL = "https://migraine-backend.onrender.com";
 const API_ENDPOINT = `${API_BASE_URL}/api/latest`;
 
 // Same update interval as Raspberry Pi publishing interval.
