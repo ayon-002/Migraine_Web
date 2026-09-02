@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Migraine Risk Monitor · IoT Environmental Dashboard</title>
+  <meta name="description" content="Real-time environmental monitoring dashboard for migraine trigger risk assessment." />
+  <meta name="theme-color" content="#0F3A5F" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" href="icons/icon-192.png" />
+
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <!-- Fonts: Manrope (UI text) + Space Grotesk (readouts / instrument numerals) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ============ LOADING OVERLAY ============ -->
+  <div class="loading-overlay" id="loadingOverlay" role="status" aria-live="polite">
+    <div class="loading-overlay__panel">
+      <span class="loading-overlay__spinner" aria-hidden="true"></span>
+      <p class="loading-overlay__title">Connecting to sensor network…</p>
+      <p class="loading-overlay__subtitle">Establishing secure link to the Migraine Risk Monitor</p>
+    </div>
+  </div>
+
+  <!-- ============ HEADER ============ -->
+  <header class="app-header">
+    <div class="container">
+      <div class="app-header__row">
+        <div class="brand">
+          <span class="brand__icon" aria-hidden="true"><i class="bi bi-activity"></i></span>
+          <div class="brand__text">
+            <span class="brand__title">Migraine Risk Monitor</span>
+            <span class="brand__subtitle">IoT Environmental Monitoring System</span>
+          </div>
+        </div>
+
+        <div class="system-indicator" role="status" aria-live="polite">
+          <button type="button" class="icon-toggle" id="themeToggle" aria-pressed="false" aria-label="Switch to dark mode">
+            <i class="bi bi-moon-stars" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="notify-toggle" id="notifyToggle" aria-pressed="false">
+            <i class="bi bi-bell" aria-hidden="true"></i>
+            <span class="notify-toggle__label">Enable Alerts</span>
+          </button>
+          <span class="system-indicator__label">System Status</span>
+          <span class="system-indicator__pill" id="headerStatusPill">
+            <span class="dot dot--connecting" id="headerStatusDot" data-status-dot aria-hidden="true"></span>
+            Connecting…
+          </span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container app-main">
+
+    <!-- ============ OFFLINE BANNER ============ -->
+    <div class="offline-banner d-none" id="offlineBanner" role="alert">
+      <i class="bi bi-wifi-off" aria-hidden="true"></i>
+      Connection to the sensor network was lost. Showing the last known readings.
+    </div>
+
+    <!-- ============ HERO / CURRENT RISK ============ -->
+    <section class="risk-hero" aria-labelledby="risk-hero-heading">
+      <div class="risk-hero__grid">
+
+        <div class="risk-hero__gauge">
+          <svg viewBox="0 0 220 140" class="gauge" role="img" aria-labelledby="gauge-title gauge-desc">
+            <title id="gauge-title">Migraine Risk Index gauge</title>
+            <desc id="gauge-desc">Semi-circular gauge showing the current MRI score out of 100</desc>
+            <path class="gauge__track" d="M20,120 A90,90 0 0 1 200,120" fill="none" stroke-width="16" stroke-linecap="round"/>
+            <path id="gaugeFill" class="gauge__fill" d="M20,120 A90,90 0 0 1 200,120" fill="none" stroke-width="16" stroke-linecap="round"/>
+          </svg>
+          <div class="gauge__readout">
+            <span class="gauge__value" id="mriValue">35.6</span>
+            <span class="gauge__scale">/ 100</span>
+            <span class="gauge__label">MRI Score</span>
+          </div>
+        </div>
+
+        <div class="risk-hero__info">
+          <p class="eyebrow" id="risk-hero-heading">Current Migraine Risk</p>
+          <div class="risk-hero__badge-row">
+            <span class="risk-badge" id="riskBadge" data-risk="MEDIUM">Medium</span>
+            <span class="risk-hero__updated" id="lastUpdated">
+              <i class="bi bi-clock-history" aria-hidden="true"></i> Last updated: Just now
+            </span>
+          </div>
+          <p class="risk-hero__summary" id="riskSummary">
+            Environmental conditions show a moderate combined risk for migraine onset.
+          </p>
+          <div class="risk-hero__trigger">
+            <span class="risk-hero__trigger-label">Dominant Trigger</span>
+            <span class="risk-hero__trigger-value" id="dominantTrigger">
+              <i class="bi bi-volume-up" aria-hidden="true"></i> Noise
+            </span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============ SENSOR OVERVIEW ============ -->
+    <section aria-labelledby="sensors-heading" class="section">
+      <h2 id="sensors-heading" class="section__title">Live Sensor Readings</h2>
+      <div class="row g-3 g-lg-4" id="sensorCards">
+
+        <div class="col-12 col-sm-6 col-lg-3">
+          <article class="sensor-card">
+            <div class="sensor-card__top">
+              <span class="sensor-card__icon"><i class="bi bi-thermometer-half" aria-hidden="true"></i></span>
+              <span class="sensor-card__trend" id="trend-temperature" aria-label="trend">
+                <i class="bi bi-dash-lg"></i>
+              </span>
+            </div>
+            <p class="sensor-card__name">Temperature</p>
+            <p class="sensor-card__value"><span id="value-temperature">28.5</span><span class="sensor-card__unit"> °C</span></p>
+            <span class="status-chip status-chip--normal" id="status-temperature">Normal</span>
+          </article>
+        </div>
+
+        <div class="col-12 col-sm-6 col-lg-3">
+          <article class="sensor-card">
+            <div class="sensor-card__top">
+              <span class="sensor-card__icon"><i class="bi bi-cloud-haze2" aria-hidden="true"></i></span>
+              <span class="sensor-card__trend" id="trend-co2" aria-label="trend">
+                <i class="bi bi-dash-lg"></i>
+              </span>
+            </div>
+            <p class="sensor-card__name">CO₂</p>
+            <p class="sensor-card__value"><span id="value-co2">850</span><span class="sensor-card__unit"> ppm</span></p>
+            <span class="status-chip status-chip--moderate" id="status-co2">Moderate</span>
+          </article>
+        </div>
+
+        <div class="col-12 col-sm-6 col-lg-3">
+          <article class="sensor-card">
+            <div class="sensor-card__top">
+              <span class="sensor-card__icon"><i class="bi bi-volume-up" aria-hidden="true"></i></span>
+              <span class="sensor-card__trend" id="trend-sound" aria-label="trend">
+                <i class="bi bi-dash-lg"></i>
+              </span>
+            </div>
+            <p class="sensor-card__name">Sound</p>
+            <p class="sensor-card__value"><span id="value-sound">62</span><span class="sensor-card__unit"> dB</span></p>
+            <span class="status-chip status-chip--elevated" id="status-sound">Elevated</span>
+          </article>
+        </div>
+
+        <div class="col-12 col-sm-6 col-lg-3">
+          <article class="sensor-card">
+            <div class="sensor-card__top">
+              <span class="sensor-card__icon"><i class="bi bi-brightness-high" aria-hidden="true"></i></span>
+              <span class="sensor-card__trend" id="trend-light" aria-label="trend">
+                <i class="bi bi-dash-lg"></i>
+              </span>
+            </div>
+            <p class="sensor-card__name">Light</p>
+            <p class="sensor-card__value"><span id="value-light">450</span><span class="sensor-card__unit"> lux</span></p>
+            <span class="status-chip status-chip--normal" id="status-light">Normal</span>
+          </article>
+        </div>
+
+      </div>
+    </section>
+
+    <div class="row g-4">
+      <!-- ============ ENVIRONMENTAL OVERVIEW ============ -->
+      <div class="col-lg-5">
+        <section aria-labelledby="env-heading" class="section">
+          <h2 id="env-heading" class="section__title">Environmental Conditions</h2>
+          <div class="panel">
+            <ul class="env-list" id="envList">
+              <li class="env-list__item">
+                <div class="env-list__head">
+                  <span><i class="bi bi-thermometer-half" aria-hidden="true"></i> Temperature</span>
+                  <span id="env-temperature">28.5 °C</span>
+                </div>
+                <div class="env-bar"><div class="env-bar__fill env-bar__fill--normal" id="env-bar-temperature" style="width: 35%"></div></div>
+              </li>
+              <li class="env-list__item">
+                <div class="env-list__head">
+                  <span><i class="bi bi-cloud-haze2" aria-hidden="true"></i> CO₂</span>
+                  <span id="env-co2">850 ppm</span>
+                </div>
+                <div class="env-bar"><div class="env-bar__fill env-bar__fill--moderate" id="env-bar-co2" style="width: 48%"></div></div>
+              </li>
+              <li class="env-list__item">
+                <div class="env-list__head">
+                  <span><i class="bi bi-volume-up" aria-hidden="true"></i> Sound</span>
+                  <span id="env-sound">62 dB</span>
+                </div>
+                <div class="env-bar"><div class="env-bar__fill env-bar__fill--elevated" id="env-bar-sound" style="width: 72%"></div></div>
+              </li>
+              <li class="env-list__item">
+                <div class="env-list__head">
+                  <span><i class="bi bi-brightness-high" aria-hidden="true"></i> Light</span>
+                  <span id="env-light">450 lux</span>
+                </div>
+                <div class="env-bar"><div class="env-bar__fill env-bar__fill--normal" id="env-bar-light" style="width: 30%"></div></div>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </div>
+
+      <!-- ============ TRIGGER ANALYSIS ============ -->
+      <div class="col-lg-7">
+        <section aria-labelledby="trigger-heading" class="section">
+          <h2 id="trigger-heading" class="section__title">Trigger Analysis</h2>
+          <div class="panel">
+            <div class="trigger-list" id="triggerList">
+
+              <div class="trigger-item" id="trigger-noise">
+                <div class="trigger-item__head">
+                  <span class="trigger-item__name"><i class="bi bi-volume-up" aria-hidden="true"></i> Noise</span>
+                  <span class="trigger-item__status status-chip status-chip--elevated">Elevated</span>
+                </div>
+                <div class="trigger-item__meta">
+                  <span id="trigger-noise-value">62 dB</span>
+                  <span>Score: <strong id="trigger-noise-score">72</strong> / 100</span>
+                </div>
+                <div class="trigger-bar"><div class="trigger-bar__fill trigger-bar__fill--elevated" id="trigger-noise-bar" style="width: 72%"></div></div>
+              </div>
+
+              <div class="trigger-item" id="trigger-co2">
+                <div class="trigger-item__head">
+                  <span class="trigger-item__name"><i class="bi bi-cloud-haze2" aria-hidden="true"></i> CO₂</span>
+                  <span class="trigger-item__status status-chip status-chip--moderate">Moderate</span>
+                </div>
+                <div class="trigger-item__meta">
+                  <span id="trigger-co2-value">850 ppm</span>
+                  <span>Score: <strong id="trigger-co2-score">48</strong> / 100</span>
+                </div>
+                <div class="trigger-bar"><div class="trigger-bar__fill trigger-bar__fill--moderate" id="trigger-co2-bar" style="width: 48%"></div></div>
+              </div>
+
+              <div class="trigger-item" id="trigger-light">
+                <div class="trigger-item__head">
+                  <span class="trigger-item__name"><i class="bi bi-brightness-high" aria-hidden="true"></i> Light</span>
+                  <span class="trigger-item__status status-chip status-chip--normal">Normal</span>
+                </div>
+                <div class="trigger-item__meta">
+                  <span id="trigger-light-value">450 lux</span>
+                  <span>Score: <strong id="trigger-light-score">30</strong> / 100</span>
+                </div>
+                <div class="trigger-bar"><div class="trigger-bar__fill trigger-bar__fill--normal" id="trigger-light-bar" style="width: 30%"></div></div>
+              </div>
+
+              <div class="trigger-item" id="trigger-temperature">
+                <div class="trigger-item__head">
+                  <span class="trigger-item__name"><i class="bi bi-thermometer-half" aria-hidden="true"></i> Temperature</span>
+                  <span class="trigger-item__status status-chip status-chip--normal">Normal</span>
+                </div>
+                <div class="trigger-item__meta">
+                  <span id="trigger-temperature-value">28.5 °C</span>
+                  <span>Score: <strong id="trigger-temperature-score">35</strong> / 100</span>
+                </div>
+                <div class="trigger-bar"><div class="trigger-bar__fill trigger-bar__fill--normal" id="trigger-temperature-bar" style="width: 35%"></div></div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ============ HISTORICAL TREND ============ -->
+    <section aria-labelledby="trend-heading" class="section">
+      <h2 id="trend-heading" class="section__title">Historical Trend <span class="section__title-note">(last hour)</span></h2>
+      <div class="panel">
+        <canvas id="trendChart" height="220" aria-label="Line chart of the Migraine Risk Index over the last hour" role="img"></canvas>
+        <p class="trend-chart-empty text-muted" id="trendChartEmpty">
+          Collecting readings — the trend line will appear once a little more data comes in.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ MRI SCORE SECTION ============ -->
+    <section aria-labelledby="mri-heading" class="section">
+      <div class="section__title-row">
+        <h2 id="mri-heading" class="section__title">Migraine Risk Index</h2>
+        <button type="button" class="icon-toggle icon-toggle--ghost" data-bs-toggle="modal" data-bs-target="#aboutModal" aria-label="About the Migraine Risk Index">
+          <i class="bi bi-info-circle" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="panel mri-panel">
+        <p class="mri-panel__intro">
+          The MRI is a combined score derived from all monitored environmental triggers &mdash;
+          temperature, light, noise and CO₂ &mdash; to give a single environmental risk indication.
+        </p>
+
+        <div class="mri-panel__score-row">
+          <span class="mri-panel__score">MRI = <strong id="mriScoreText">35.6</strong> / 100</span>
+          <span class="risk-badge" id="mriRiskBadge" data-risk="MEDIUM">Medium</span>
+        </div>
+
+        <div class="mri-scale">
+          <div class="mri-scale__track">
+            <div class="mri-scale__fill" id="mriScaleFill" style="width: 35.6%"></div>
+            <div class="mri-scale__marker" id="mriScaleMarker" style="left: 35.6%" aria-hidden="true"></div>
+          </div>
+          <div class="mri-scale__ranges" id="mriRanges">
+            <div class="mri-scale__range" data-range="LOW">
+              <span class="mri-scale__range-value">0&ndash;29</span>
+              <span class="mri-scale__range-label">Low</span>
+            </div>
+            <div class="mri-scale__range" data-range="MEDIUM">
+              <span class="mri-scale__range-value">30&ndash;59</span>
+              <span class="mri-scale__range-label">Medium</span>
+            </div>
+            <div class="mri-scale__range" data-range="HIGH">
+              <span class="mri-scale__range-value">60&ndash;79</span>
+              <span class="mri-scale__range-label">High</span>
+            </div>
+            <div class="mri-scale__range" data-range="SEVERE">
+              <span class="mri-scale__range-value">80&ndash;100</span>
+              <span class="mri-scale__range-label">Severe</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ RECOMMENDATION / ALERT ============ -->
+    <section aria-labelledby="rec-heading" class="section">
+      <h2 id="rec-heading" class="section__title">Monitoring Recommendation</h2>
+      <div class="recommendation-card" id="recommendationCard" data-risk="MEDIUM">
+        <div class="recommendation-card__head">
+          <span class="recommendation-card__icon" aria-hidden="true"><i class="bi bi-exclamation-triangle-fill"></i></span>
+          <div>
+            <p class="recommendation-card__eyebrow">Environmental risk indication &mdash; not a medical diagnosis</p>
+            <p class="recommendation-card__message" id="recommendationMessage">
+              Environmental conditions may contribute to migraine discomfort.
+            </p>
+          </div>
+        </div>
+        <ul class="recommendation-card__list" id="recommendationList">
+          <li><i class="bi bi-check2-circle" aria-hidden="true"></i> Consider reducing surrounding noise.</li>
+          <li><i class="bi bi-check2-circle" aria-hidden="true"></i> Maintain comfortable room temperature.</li>
+          <li><i class="bi bi-check2-circle" aria-hidden="true"></i> Monitor CO₂ levels in the room.</li>
+          <li><i class="bi bi-check2-circle" aria-hidden="true"></i> Avoid prolonged exposure to harsh lighting.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ SYSTEM STATUS ============ -->
+    <section aria-labelledby="status-heading" class="section">
+      <h2 id="status-heading" class="section__title">System Status</h2>
+      <div class="panel status-panel">
+        <div class="status-panel__item">
+          <span class="dot dot--connecting" data-status-dot aria-hidden="true"></span>
+          <span class="status-panel__label">MQTT Connection</span>
+          <span class="status-panel__value" id="statusMqtt">Connecting…</span>
+        </div>
+        <div class="status-panel__item">
+          <span class="dot dot--connecting" data-status-dot aria-hidden="true"></span>
+          <span class="status-panel__label">Data Stream</span>
+          <span class="status-panel__value" id="statusStream">Waiting for data</span>
+        </div>
+        <div class="status-panel__item">
+          <span class="dot dot--connecting" data-status-dot aria-hidden="true"></span>
+          <span class="status-panel__label">Raspberry Pi</span>
+          <span class="status-panel__value" id="statusPi">Connecting…</span>
+        </div>
+        <div class="status-panel__item">
+          <span class="dot dot--connecting" data-status-dot aria-hidden="true"></span>
+          <span class="status-panel__label">Last Data Received</span>
+          <span class="status-panel__value" id="lastDataReceived">—</span>
+        </div>
+        <div class="status-panel__item">
+          <span class="dot dot--online" aria-hidden="true"></span>
+          <span class="status-panel__label">Update Interval</span>
+          <span class="status-panel__value">2 seconds</span>
+        </div>
+      </div>
+      <button type="button" class="demo-link-btn" id="simulateOfflineBtn">
+        Simulate connection loss (demo)
+      </button>
+    </section>
+
+    <!-- ============ DATA EXPORT ============ -->
+    <section aria-labelledby="export-heading" class="section">
+      <h2 id="export-heading" class="section__title">Export Data</h2>
+      <div class="panel export-panel">
+        <p class="export-panel__intro">
+          Save a snapshot of the current reading, or the full trend history collected this session.
+        </p>
+        <div class="export-panel__actions">
+          <button type="button" class="btn-outline" id="exportJsonBtn">
+            <i class="bi bi-filetype-json" aria-hidden="true"></i> Export current reading (JSON)
+          </button>
+          <button type="button" class="btn-outline" id="exportCsvBtn">
+            <i class="bi bi-filetype-csv" aria-hidden="true"></i> Export history (CSV)
+          </button>
+        </div>
+        <p class="export-panel__feedback text-muted d-none" id="exportFeedback"></p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="app-footer">
+    <div class="container app-footer__inner">
+      <p class="app-footer__title">Migraine Risk Monitoring System</p>
+      <p class="app-footer__line">Powered by Raspberry Pi &bull; MQTT &bull; Node.js</p>
+      <p class="app-footer__line app-footer__line--muted">Academic IoT Project</p>
+    </div>
+  </footer>
+
+  <!-- ============ ABOUT / HOW MRI IS CALCULATED MODAL ============ -->
+  <div class="modal fade" id="aboutModal" tabindex="-1" aria-labelledby="aboutModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="aboutModalLabel">About the Migraine Risk Index</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>
+            The Migraine Risk Index (MRI) is a demonstration score, built for this project, that
+            combines four monitored environmental factors into a single 0&ndash;100 reading:
+          </p>
+          <ul class="about-modal__list">
+            <li><strong>Noise</strong> &mdash; sound level in decibels (dB)</li>
+            <li><strong>CO₂</strong> &mdash; carbon dioxide concentration in parts per million (ppm)</li>
+            <li><strong>Light</strong> &mdash; ambient brightness in lux</li>
+            <li><strong>Temperature</strong> &mdash; ambient temperature in °C</li>
+          </ul>
+          <p>
+            Each sensor reading is converted into a 0&ndash;100 trigger score, and the overall MRI
+            reflects how these combined readings compare against the ranges below.
+          </p>
+          <table class="about-modal__table">
+            <thead>
+              <tr><th>Range</th><th>Risk level</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>0&ndash;29</td><td>Low</td></tr>
+              <tr><td>30&ndash;59</td><td>Medium</td></tr>
+              <tr><td>60&ndash;79</td><td>High</td></tr>
+              <tr><td>80&ndash;100</td><td>Severe</td></tr>
+            </tbody>
+          </table>
+          <p class="about-modal__disclaimer">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            This is an environmental risk indication for a university IoT project, not a medical
+            diagnosis or clinical tool. Always consult a healthcare professional about migraine
+            symptoms or triggers.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ RISK ALERT TOAST ============ -->
+  <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;" aria-live="assertive" aria-atomic="true">
+    <div id="riskAlertToast" class="toast risk-toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false">
+      <div class="risk-toast__head">
+        <span class="risk-toast__icon" id="riskToastIcon" aria-hidden="true"><i class="bi bi-exclamation-triangle-fill"></i></span>
+        <strong class="risk-toast__title" id="riskToastTitle">Elevated Risk Detected</strong>
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+      <div class="risk-toast__body" id="riskToastBody">
+        Environmental readings indicate an elevated migraine risk level.
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- App scripts: load order matters, each file builds on the ones before it -->
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/connection.js"></script>
+  <script src="js/history.js"></script>
+  <script src="js/chart.js"></script>
+  <script src="js/alerts.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
